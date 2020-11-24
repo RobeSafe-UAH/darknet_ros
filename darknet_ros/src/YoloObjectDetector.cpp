@@ -85,6 +85,7 @@ void YoloObjectDetector::init() {
 
   // Path to weights file.
   nodeHandle_.param("yolo_model/weight_file/name", weightsModel, std::string("yolov2-tiny.weights"));
+  std::cout << std::endl << "Weights: " << weightsModel << std::endl<< std::endl<< std::endl<< std::endl<< std::endl;
   nodeHandle_.param("weights_path", weightsPath, std::string("/default"));
   weightsPath += "/" + weightsModel;
   weights = new char[weightsPath.length() + 1];
@@ -142,8 +143,23 @@ void YoloObjectDetector::init() {
   imageSubscriber_ = imageTransport_.subscribe(cameraTopicName, cameraQueueSize, &YoloObjectDetector::cameraCallback, this);
   objectPublisher_ =
       nodeHandle_.advertise<darknet_ros_msgs::ObjectCount>(objectDetectorTopicName, objectDetectorQueueSize, objectDetectorLatch);
-  boundingBoxesPublisher_ =
-      nodeHandle_.advertise<darknet_ros_msgs::BoundingBoxes>(boundingBoxesTopicName, boundingBoxesQueueSize, boundingBoxesLatch);
+
+
+
+
+
+
+
+  boundingBoxesPublisher_center_ =
+      nodeHandle_.advertise<darknet_ros_msgs::BoundingBoxes>("/darknet_ros/bounding_boxes", boundingBoxesQueueSize, boundingBoxesLatch);
+
+
+
+
+
+
+
+      
   detectionImagePublisher_ =
       nodeHandle_.advertise<sensor_msgs::Image>(detectionImageTopicName, detectionImageQueueSize, detectionImageLatch);
 
@@ -160,6 +176,7 @@ void YoloObjectDetector::cameraCallback(const sensor_msgs::ImageConstPtr& msg) {
   ROS_DEBUG("[YoloObjectDetector] USB image received.");
 
   cv_bridge::CvImagePtr cam_image;
+  current_camera_ = msg->header.frame_id;
 
   try {
     cam_image = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
@@ -231,7 +248,7 @@ bool YoloObjectDetector::publishDetectionImage(const cv::Mat& detectionImage) {
   if (detectionImagePublisher_.getNumSubscribers() < 1) return false;
   cv_bridge::CvImage cvImage;
   cvImage.header.stamp = ros::Time::now();
-  cvImage.header.frame_id = "detection_image";
+  cvImage.header.frame_id = current_camera_;
   cvImage.encoding = sensor_msgs::image_encodings::BGR8;
   cvImage.image = detectionImage;
   detectionImagePublisher_.publish(*cvImage.toImageMsg());
@@ -500,7 +517,7 @@ void YoloObjectDetector::yolo() {
       publishInThread();
     } else {
       char name[256];
-      sprintf(name, "%s_%08d", demoPrefix_, count);
+      //sprintf(name, "%s_%08d", demoPrefix_, count);
       save_image(buff_[(buffIndex_ + 1) % 3], name);
     }
     fetch_thread.join();
@@ -535,6 +552,10 @@ void* YoloObjectDetector::publishInThread() {
     ROS_DEBUG("Detection image has not been broadcasted.");
   }
 
+  boundingBoxesResults_.header.stamp = ros::Time::now();
+  boundingBoxesResults_.header.frame_id = current_camera_;
+  boundingBoxesResults_.image_header = headerBuff_[(buffIndex_ + 1) % 3];
+
   // Publish bounding boxes and detection result.
   int num = roiBoxes_[0].num;
   if (num > 0 && num <= 100) {
@@ -549,7 +570,7 @@ void* YoloObjectDetector::publishInThread() {
 
     darknet_ros_msgs::ObjectCount msg;
     msg.header.stamp = ros::Time::now();
-    msg.header.frame_id = "detection";
+    msg.header.frame_id = current_camera_;
     msg.count = num;
     objectPublisher_.publish(msg);
 
@@ -574,17 +595,26 @@ void* YoloObjectDetector::publishInThread() {
         }
       }
     }
-    boundingBoxesResults_.header.stamp = ros::Time::now();
-    boundingBoxesResults_.header.frame_id = "detection";
-    boundingBoxesResults_.image_header = headerBuff_[(buffIndex_ + 1) % 3];
-    boundingBoxesPublisher_.publish(boundingBoxesResults_);
   } else {
     darknet_ros_msgs::ObjectCount msg;
     msg.header.stamp = ros::Time::now();
-    msg.header.frame_id = "detection";
+    msg.header.frame_id = current_camera_;
     msg.count = 0;
     objectPublisher_.publish(msg);
   }
+
+  std::cout << "Current camera: " << current_camera_ << std::endl;
+  if (!strcmp("Camera_Left",current_camera_.c_str()))
+  {
+    std::cout << "Entra CENTER" << std::endl;
+    boundingBoxesPublisher_center_.publish(boundingBoxesResults_);
+  }
+  else
+  {
+    std::cout << "Entra ZOOM" << std::endl;
+    boundingBoxesPublisher_zoom_.publish(boundingBoxesResults_);
+  }
+  
   if (isCheckingForObjects()) {
     ROS_DEBUG("[YoloObjectDetector] check for objects in image.");
     darknet_ros_msgs::CheckForObjectsResult objectsActionResult;

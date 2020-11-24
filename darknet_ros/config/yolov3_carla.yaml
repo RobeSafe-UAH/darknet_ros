@@ -1,0 +1,23 @@
+yolo_model:
+
+  config_file:
+    name: yolo-carla13.cfg
+  weight_file:
+    name: yolo-carla13_33000.weights
+  threshold:
+    value: 0.5
+  detection_classes:
+    names:
+      - trafficlight_00
+      - trafficlight_01
+      - trafficlight_02
+      - trafficsignal_00
+      - trafficsignal_01
+      - trafficsignal_02
+      - bicycle
+      - bus
+      - car
+      - motorbike
+      - person
+      - stop_vertical
+      - stop_suelo

@@ -146,7 +146,8 @@ class YoloObjectDetector {
   //! ROS subscriber and publisher.
   image_transport::Subscriber imageSubscriber_;
   ros::Publisher objectPublisher_;
-  ros::Publisher boundingBoxesPublisher_;
+  ros::Publisher boundingBoxesPublisher_center_;
+  ros::Publisher boundingBoxesPublisher_zoom_;
 
   //! Detected objects.
   std::vector<std::vector<RosBox_> > rosBoxes_;
@@ -192,6 +193,7 @@ class YoloObjectDetector {
   double demoTime_;
 
   RosBox_* roiBoxes_;
+  std::string current_camera_;
   bool viewImage_;
   bool enableConsoleOutput_;
   int waitKeyDelay_;
